@@ -19,8 +19,37 @@ const Top = styled.div`
 
 export default function Home() {
   const [user, setUser] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [errorProfile, setErrorProfile] = useState(null);
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => setUser(u));
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        setLoadingProfile(true);
+        setErrorProfile(null);
+        try {
+          const token = await u.getIdToken();
+          const res = await fetch('https://seu-backend.vercel.app/me', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          if (!res.ok) throw new Error(`Erro ${res.status}`);
+          const data = await res.json();
+          setProfileData(data);
+        } catch (err) {
+          setErrorProfile(err.message);
+          setProfileData(null);
+        } finally {
+          setLoadingProfile(false);
+        }
+      } else {
+        setProfileData(null);
+        setErrorProfile(null);
+      }
+    });
     return unsub;
   }, []);
 
@@ -47,9 +76,19 @@ export default function Home() {
           )}
         </div>
       </Top>
+
       <section>
         <h3>Feed</h3>
-        <p>Coloque aqui cards de vídeo em Libras, eventos e comunidades locais.</p>
+        {loadingProfile && <p>Carregando perfil...</p>}
+        {errorProfile && <p style={{ color: 'red' }}>Erro: {errorProfile}</p>}
+        {profileData && (
+          <pre style={{ background: '#222', padding: '10px', borderRadius: '8px', color: '#eee' }}>
+            {JSON.stringify(profileData, null, 2)}
+          </pre>
+        )}
+        {!loadingProfile && !profileData && !errorProfile && (
+          <p>Coloque aqui cards de vídeo em Libras, eventos e comunidades locais.</p>
+        )}
       </section>
     </Wrapper>
   );
